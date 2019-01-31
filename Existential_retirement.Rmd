@@ -1,0 +1,105 @@
+---
+title: "An Existential Look at Stocks and Retirement"
+author: "Rowan Callahan"
+date: "January 27, 2019"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+This is an RShiny [Interactive Document](http://rmarkdown.rstudio.com/authoring_shiny.html)
+
+## What is Investing?
+[Investing](https://en.wiktionary.org/wiki/investment) usually refers to any strategy of using money to generate more money. The goal is usually to buy something with the hope that it will be worth more later. Most people when they talk about investing mean investing in stocks and or bonds so that they have enough money at the end of their working career to retire.
+
+I will be using `rshiny` and `rmarkdown` to explore the assumptions behind investing and hopefully have some fun while getting a little bit ~existential~ about the whole idea of investing!
+
+Most people view investments as a simple matter of exponential growth.
+
+You put in x amount of money and it will increase with compound interest year after year until the manageable amount you put in has become large enough to retire and support you into old age. Most retirement calculators work based off this assumption of exponential growth, and they look something like this.
+```{r, echo=FALSE}
+library(shiny)
+inputPanel(
+   sliderInput("increase", label = "percent yearly increase",
+              min = -1, max = 15, value = 6, step = 0.2),
+   sliderInput("contrib",label = "income saved per month",
+               min = 0, max = 10000, value = 500, step = 250)
+)
+
+money <- reactive({
+  c <- input$contrib * 12 #money contributed per year
+  k <- (input$increase/100) #percent increase per year
+  a <- c/k #for use in the solved equation
+  return <- function(x){(a * exp(k*x)) - a}
+})
+
+renderPlot({
+  plot(money()(0:35),type='l')
+})
+
+
+```
+
+However when pressed any investment professional will tell you that there is an element of randomness to the stock market (understatement of the year) that doesn't always cooperate with the retiree
+
+```{r, echo=FALSE}
+library(shiny)
+inputPanel(
+  selectInput("mean", label = "mean",
+              choices = c(-10, 0, 5, 10), selected = 0),
+  
+  sliderInput("variance", label = "variance",
+              min = 0.2, max = 2, value = 1, step = 0.2)
+)
+samples <- reactive({
+  data_in <- rnorm(300,mean=as.numeric(input$mean), 
+                   sd=as.numeric(input$variance))
+  return <- data_in
+})
+
+renderPlot({
+  hist(samples(), probability = TRUE,
+       xlab = "Change in value", main = "The distribution for a gaussian random walk")
+  
+})
+
+renderText("text rendering works")
+```
+
+So what happens when we take a random distribution and see how it stacks up when we see how a bunch of small random changes with a positive mean.
+
+```{r, echo=FALSE}
+library(shiny)
+
+inputPanel(
+   sliderInput("stoch_increase", label = "average point increase per year",
+              min = 0.0, max = 2, value = 1, step = 0.05),
+   sliderInput("freq",label = "how many times to measure per year",
+               min = 2, max = 12 , value = 2, step = 2),
+   sliderInput("sd",label="how much crazy are these theoretical markets?",
+               min=0, max=0.5, value=0.1, step=0.05)
+)
+
+stock_move<- reactive({
+  set.seed(4)
+  data_in <- rnorm(input$freq*35,
+                   mean=input$stoch_increase/input$freq, 
+                   sd=input$sd)
+  return <- data_in
+})
+
+renderPlot({
+  plot(exp(cumsum(stock_move())),type='l')
+  plot(money(), 0, 70,add=TRUE)
+})
+
+```
+
+
+Now lets look at some actual market data and see how people actually did assuming that they put all of their investments into stocks when they turned 25 and retired when they were at least 60. How did their money turn out
+
+
+
