@@ -76,11 +76,11 @@ library(shiny)
 
 inputPanel(
    sliderInput("stoch_increase", label = "average point increase per year",
-              min = 0.0, max = 2, value = 1, step = 0.05),
+              min = 0.0, max = 2, value = 0.35, step = 0.05),
    sliderInput("freq",label = "how many times to measure per year",
                min = 2, max = 12 , value = 2, step = 2),
    sliderInput("sd",label="how much crazy are these theoretical markets?",
-               min=0, max=0.5, value=0.1, step=0.05)
+               min=0, max=0.5, value=0.25, step=0.05)
 )
 
 stock_move<- reactive({
@@ -102,4 +102,11 @@ renderPlot({
 Now lets look at some actual market data and see how people actually did assuming that they put all of their investments into stocks when they turned 25 and retired when they were at least 60. How did their money turn out
 
 
+```{r, echo=FALSE}
+library(shiny)
 
+data=read.csv("./sp_data.csv",row.names=1)
+renderPlot({
+  plot(data$time,data$Value.Value,type='l')
+})
+```
