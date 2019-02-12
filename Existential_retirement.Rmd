@@ -104,9 +104,31 @@ Now lets look at some actual market data and see how people actually did assumin
 
 ```{r, echo=FALSE}
 library(shiny)
+library(purrr)
+library(ggplot2)
+stocks<-read.csv("./sp_data.csv",row.names=1)
+stocks<-stocks[order(stocks$time),]
 
-data=read.csv("./sp_data.csv",row.names=1)
+add_stock<- function(stock_amount, stock_price){
+  dollars_to_add <- 300
+  new_amount <- stock_amount + (dollars_to_add/stock_price)
+  return(new_amount)}
+
+stock_amount <- accumulate(as.numeric(stocks$Value.Value), add_stock)
+stocks$money <- stock_amount * as.numeric(stocks$Value.Value)
+
 renderPlot({
-  plot(data$time,data$Value.Value,type='l')
+#  plot(data$time,data$Value.Value,type='l')
+#  par(new=TRUE)
+#  plot(stocks$time,stock_money)
+ggplot() + 
+    geom_point(data=stocks, aes(x=time, y=money)) +
+    geom_smooth()
 })
+
+renderPlot({
+      ggplot() + geom_point(data=stocks, aes(x=time, y=Value.Value)) +
+      geom_smooth()
+})
+
 ```
