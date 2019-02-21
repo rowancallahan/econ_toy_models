@@ -2,7 +2,9 @@
 title: "An Existential Look at Stocks and Retirement"
 author: "Rowan Callahan"
 date: "January 27, 2019"
-output: html_document
+output: 
+  html_document:
+    mathjax: default
 runtime: shiny
 ---
 
@@ -20,6 +22,13 @@ I will be using `rshiny` and `rmarkdown` to explore the assumptions behind inves
 Most people view investments as a simple matter of exponential growth.
 
 You put in x amount of money and it will increase with compound interest year after year until the manageable amount you put in has become large enough to retire and support you into old age. Most retirement calculators work based off this assumption of exponential growth, and they look something like this.
+
+For those who are a little less familiar with exponential growth, and the main advertising behind investment banking the basic equation is as follows.
+
+$$m_t = Xe^{kt} $$
+Money at time t is equivalent to the growth rate K the amount of money you start with and the amount of time that has passed.
+
+
 ```{r, echo=FALSE}
 library(shiny)
 inputPanel(
@@ -43,16 +52,26 @@ renderPlot({
 
 ```
 
-However when pressed any investment professional will tell you that there is an element of randomness to the stock market (understatement of the year) that doesn't always cooperate with the retiree
+However when pressed any investment professional will tell you that there is an element of randomness to the stock market (understatement of the year) that doesn't always cooperate with the retiree.
+
+Some people prefer to view stock market motions as a random walk. Where
+the value is a sum of random movements. Each random movement is considered to be part of a "normal distribution"
+
+$$ X \sim N{(\mu,\sigma)} $$
+
+This can be read as X is distributed according to the normal distribution with mean mu and variance sigma.
+
+Below is an example of what a "normal" also known as a gaussian distribution looks like.
+
 
 ```{r, echo=FALSE}
 library(shiny)
 inputPanel(
   selectInput("mean", label = "mean",
-              choices = c(-10, 0, 5, 10), selected = 0),
+              choices = c(-1, 0, 1, 2), selected = 0),
   
   sliderInput("variance", label = "variance",
-              min = 0.2, max = 2, value = 1, step = 0.2)
+              min = 0.2, max = 8, value = 1, step = 0.2)
 )
 samples <- reactive({
   data_in <- rnorm(300,mean=as.numeric(input$mean), 
@@ -66,10 +85,20 @@ renderPlot({
   
 })
 
-renderText("text rendering works")
 ```
 
-So what happens when we take a random distribution and see how it stacks up when we see how a bunch of small random changes with a positive mean.
+So what happens when we take a random distribution and see how it stacks up when we see how a bunch of small random changes with a positive mean. This is called a random walk, or more specifically Brownian motion. Some people like to think of the stock market as an example of random movements either up or down.
+
+```{r,echo=FALSE}
+
+renderPlot({
+  plot(cumsum(samples()),type='l')
+})
+
+```
+
+To move this back into the realm of exponential growth, which some people seem to think of as a more accurate portrayal of the stock market.
+
 
 ```{r, echo=FALSE}
 library(shiny)
@@ -101,34 +130,90 @@ renderPlot({
 
 Now lets look at some actual market data and see how people actually did assuming that they put all of their investments into stocks when they turned 25 and retired when they were at least 60. How did their money turn out
 
+Just to make things a little more fun lets decide when you are going to start and when you are going to stop investing. Give us a start date and an end date!
 
 ```{r, echo=FALSE}
 library(shiny)
 library(purrr)
 library(ggplot2)
+
 stocks<-read.csv("./sp_data.csv",row.names=1)
 stocks<-stocks[order(stocks$time),]
 
 add_stock<- function(stock_amount, stock_price){
   dollars_to_add <- 300
+  #This the assumption that you buy 300 dollars of s+p each month
+  #This needs to be changed to be modifiable, 
   new_amount <- stock_amount + (dollars_to_add/stock_price)
   return(new_amount)}
 
-stock_amount <- accumulate(as.numeric(stocks$Value.Value), add_stock)
-stocks$money <- stock_amount * as.numeric(stocks$Value.Value)
+stocks$date <- as.Date(stocks$time, format = "%Y-%m-%d")
+
+
+inputPanel(
+  dateInput("startdate", label = h2("Time travel start point"), value = "1910-01-01"),
+  dateInput("stopdate", label = h2("Time travel retirement"), value = "1950-01-01"),
+  hr(),
+  fluidRow(column(3, verbatimTextOutput("value")))
+)
+subset_stocks <- reactive({
+  time_bound <- subset(stocks, stocks$date > input$startdate & stocks$date < input$stopdate)
+ 
+  time_bound$amount <- accumulate(as.numeric(time_bound$Value.Value), add_stock)
+
+  time_bound$money <- time_bound$amount * as.numeric(time_bound$Value.Value)
+
+  return <- time_bound 
+})
+
+percent_increase <- reactive({
+ months <- length(subset_stocks()$money)
+ money_in <- months * 300
+ money_final <- tail(subset_stocks()$money,n=1)
+ return <- as.character( (money_final/money_in - 1)*100)
+})
+
+exponential_comparison <- reactive({
+#  years <- difftime(input$stopdate,input$startdate, units="days")
+#  c <- 300 * 12 #money contributed per year
+#  k <- (input$increase/100) #percent increase per year
+#  a <- c/k #for use in the solved equation
+#  c/k * exp(k*x) - c/k
+#  return <- function(x){(a * exp(k*x)) - a}
+})
+
+renderText(paste0("your money increased by ",percent_increase(),"% compared to what you would have if you just stuffed it under your matress"))
+```
+
+Ok so you are aware of the risks of investing with our fabulous hedge fund but you roll the dice and invest anyway, how did you do within the years that you specified?
+
+Did you make a good return? Was it all worth it?
+
+```{r, echo=FALSE}
 
 renderPlot({
 #  plot(data$time,data$Value.Value,type='l')
 #  par(new=TRUE)
 #  plot(stocks$time,stock_money)
-ggplot() + 
-    geom_point(data=stocks, aes(x=time, y=money)) +
-    geom_smooth()
+  ggplot(data=subset_stocks(), aes(x=date, y=money, group=1)) +
+  geom_line()+
+  ylab("Retirement Fund Value")
 })
 
 renderPlot({
-      ggplot() + geom_point(data=stocks, aes(x=time, y=Value.Value)) +
-      geom_smooth()
+  ggplot(data=subset_stocks(), aes(x=date, y=Value.Value, group=1)) +
+  geom_smooth() +
+  geom_line() + 
+  ylab("Stock Market Value")
+  #scale_x_date(date_breaks="5 years", date_labels = "%b-%y")
+})
+
+renderPlot({
+  ggplot(data=subset_stocks(), aes(x=date, y=amount,group=1)) + 
+  geom_line() +
+  ylab("Number of S+P Shares in retirement fund")
 })
 
 ```
+
+
