@@ -21,47 +21,50 @@ I will be using `rshiny` and `rmarkdown` to explore the assumptions behind inves
 
 Most people view investments as a simple matter of exponential growth.
 
-You put in x amount of money and it will increase with compound interest year after year until the manageable amount you put in has become large enough to retire and support you into old age. Most retirement calculators work based off this assumption of exponential growth, and they look something like this.
+You put in x amount of money and it will increase with compound interest year after year until the manageable amount you put in has become large enough to retire and support you into old age. 
 
 For those who are a little less familiar with exponential growth, and the main advertising behind investment banking the basic equation is as follows.
 
 $$m_t = Xe^{kt} $$
-Money at time t is equivalent to the growth rate K the amount of money you start with and the amount of time that has passed.
 
+Money at time t is equivalent to the principal times the growth term. The growth term e to the k times t the amount of time that has passed.
+
+Most retirement calculators work based off this assumption of exponential growth, and they look something like this.
 
 ```{r, echo=FALSE}
 library(shiny)
 inputPanel(
    sliderInput("increase", label = "percent yearly increase",
               min = -1, max = 15, value = 6, step = 0.2),
-   sliderInput("contrib",label = "income saved per month",
-               min = 0, max = 10000, value = 500, step = 250)
+   selectInput("contrib",label = "income saved per month",
+               choices = c(100, 200, 500, 1000, 2000), selected = 500)
 )
 
 money <- reactive({
-  c <- input$contrib * 12 #money contributed per year
+  c <- as.numeric(input$contrib) * 12 #money contributed per year
   k <- (input$increase/100) #percent increase per year
   a <- c/k #for use in the solved equation
   return <- function(x){(a * exp(k*x)) - a}
 })
 
 renderPlot({
-  plot(money()(0:35),type='l')
+  plot(money()(0:35),type='l',ylim=c(0,5000000), ylab = "Assets",xlab="months since starting")
 })
 
 
 ```
 
-However when pressed any investment professional will tell you that there is an element of randomness to the stock market (understatement of the year) that doesn't always cooperate with the retiree.
+This all looks pretty exciting. Without doing anything you can guarantee that you will double or even triple the amount of money that you have been saving up.
 
-Some people prefer to view stock market motions as a random walk. Where
-the value is a sum of random movements. Each random movement is considered to be part of a "normal distribution"
+However, when pressed any investment professional will tell you that there is an element of randomness to the stock market (understatement of the year) that doesn't always cooperate with the retiree.
 
+Some people prefer to view stock market motions as a random walk.
+A random walk is a specfic kind of series where each of step is randomly chosen from a distribution. In our case we will be randomly drawing samples from the "normal" or gaussian distribution. This means that each individual step is most likely to fall on the mean, but could be much smaller or larger. So each step X in math terms is equivalent to the following.
 $$ X \sim N{(\mu,\sigma)} $$
 
 This can be read as X is distributed according to the normal distribution with mean mu and variance sigma.
 
-Below is an example of what a "normal" also known as a gaussian distribution looks like.
+Below is an example of what a "normal" gaussian distribution looks like depending on what characteristics you choose to give it. Increasing the variance will increase how likely extreme values on either end are, and increasing the mean will shift the distribution to the left or to the right.
 
 
 ```{r, echo=FALSE}
@@ -74,30 +77,44 @@ inputPanel(
               min = 0.2, max = 8, value = 1, step = 0.2)
 )
 samples <- reactive({
+  set.seed(4)
   data_in <- rnorm(300,mean=as.numeric(input$mean), 
                    sd=as.numeric(input$variance))
   return <- data_in
 })
 
 renderPlot({
-  hist(samples(), probability = TRUE,
+  hist(samples(), probability = TRUE, breaks=40,
+       xlim=c(-4,4),ylim=c(0,0.5),
        xlab = "Change in value", main = "The distribution for a gaussian random walk")
   
 })
 
 ```
 
-So what happens when we take a random distribution and see how it stacks up when we see how a bunch of small random changes with a positive mean. This is called a random walk, or more specifically Brownian motion. Some people like to think of the stock market as an example of random movements either up or down.
+So what happens when we take a bunch of these random variables and add them together while recording their sum along the way. This is called a random walk, or more specifically because each variable is normally distributed, Brownian motion. Some people like to think of the stock market as an example of Brownian motion or at the very least some form of a random walk.
+
+Mathematically we can describe the position of the random walk at time t as follows:
+
+$$ brownian(t) = \sum_{\substack{x=0 \\ x \sim N{(\mu,\sigma)}}}^{x=t} x_i $$
 
 ```{r,echo=FALSE}
 
 renderPlot({
-  plot(cumsum(samples()),type='l')
+  plot(cumsum(samples()),type='l',ylim=c(-100,300))
+  
 })
 
 ```
+So while this might look convincing for some stocks on a more local viewpoint, it isn't very convincing when looking at the S+P over long time periods, and its even less exciting. 
 
-To move this back into the realm of exponential growth, which some people seem to think of as a more accurate portrayal of the stock market.
+So lets move this back into the realm of exponential growth. Some people seem to think of this as a more accurate portrayal of the stock market. This model is also one of the more famous models of stock modelling, which people call geometric brownian motion. This is a model where the logarithm of the motion follows a brownian motion path.
+
+
+$$ log(brownian(t)) = gmtricbrownian(t) $$ 
+$$gmtricbrownian(t) = e^{\sum_{x=0}^{x=t} x_i} $$
+If we shift the mean of this random walk so that it is positive centered, cross our fingers and squint a little bit we can even convince ourselves that it looks like a pretty good model of both the stock market historically and exponential growth.
+
 
 
 ```{r, echo=FALSE}
@@ -121,14 +138,12 @@ stock_move<- reactive({
 })
 
 renderPlot({
-  plot(exp(cumsum(stock_move())),type='l')
-  plot(money(), 0, 70,add=TRUE)
+  plot(exp(cumsum(stock_move())),type='l',xlim=c(0,70),ylim=c(0,3500000),ylab="Dollars in assets")
+  plot(money(), 0, 70,add=TRUE,ylab="Dollars in assets")
 })
 
 ```
-
-
-Now lets look at some actual market data and see how people actually did assuming that they put all of their investments into stocks when they turned 25 and retired when they were at least 60. How did their money turn out
+Ok so maybe fairly convincing, but what are some actual returns that people experienced across different time periods. Maybe these returns will offer a better way to look at what is likely to happen over time investing.
 
 Just to make things a little more fun lets decide when you are going to start and when you are going to stop investing. Give us a start date and an end date!
 
@@ -140,12 +155,11 @@ library(ggplot2)
 stocks<-read.csv("./sp_data.csv",row.names=1)
 stocks<-stocks[order(stocks$time),]
 
-add_stock<- function(stock_amount, stock_price){
-  dollars_to_add <- 300
-  #This the assumption that you buy 300 dollars of s+p each month
-  #This needs to be changed to be modifiable, 
+add_stock<- reactive({ function(stock_amount, stock_price){
+  dollars_to_add <- as.numeric(input$contrib)
   new_amount <- stock_amount + (dollars_to_add/stock_price)
   return(new_amount)}
+  })
 
 stocks$date <- as.Date(stocks$time, format = "%Y-%m-%d")
 
@@ -156,10 +170,11 @@ inputPanel(
   hr(),
   fluidRow(column(3, verbatimTextOutput("value")))
 )
+
 subset_stocks <- reactive({
   time_bound <- subset(stocks, stocks$date > input$startdate & stocks$date < input$stopdate)
  
-  time_bound$amount <- accumulate(as.numeric(time_bound$Value.Value), add_stock)
+  time_bound$amount <- accumulate(as.numeric(time_bound$Value.Value), add_stock())
 
   time_bound$money <- time_bound$amount * as.numeric(time_bound$Value.Value)
 
@@ -168,33 +183,27 @@ subset_stocks <- reactive({
 
 percent_increase <- reactive({
  months <- length(subset_stocks()$money)
- money_in <- months * 300
+ money_in <- months * as.numeric(input$contrib)
  money_final <- tail(subset_stocks()$money,n=1)
  return <- as.character( (money_final/money_in - 1)*100)
 })
 
-exponential_comparison <- reactive({
-#  years <- difftime(input$stopdate,input$startdate, units="days")
-#  c <- 300 * 12 #money contributed per year
-#  k <- (input$increase/100) #percent increase per year
-#  a <- c/k #for use in the solved equation
-#  c/k * exp(k*x) - c/k
-#  return <- function(x){(a * exp(k*x)) - a}
-})
 
+```
+
+So if you were someone who started investing when you specified you probably have a couple of questions.
+1 Did you make a good return? 2 Was it all worth it?
+
+```{r,echo=FALSE}
 renderText(paste0("your money increased by ",percent_increase(),"% compared to what you would have if you just stuffed it under your matress"))
 ```
 
-Ok so you are aware of the risks of investing with our fabulous hedge fund but you roll the dice and invest anyway, how did you do within the years that you specified?
+Ok So most likely this is better than nothing, but how much were you promised by the simple calculation of exponential growth? Its likely that this is a significantly larger amount than what the stock market delivered on average.
 
-Did you make a good return? Was it all worth it?
 
 ```{r, echo=FALSE}
 
 renderPlot({
-#  plot(data$time,data$Value.Value,type='l')
-#  par(new=TRUE)
-#  plot(stocks$time,stock_money)
   ggplot(data=subset_stocks(), aes(x=date, y=money, group=1)) +
   geom_line()+
   ylab("Retirement Fund Value")
@@ -216,4 +225,35 @@ renderPlot({
 
 ```
 
+But on the whole what do returns look like for investors who decide to put their money into the stock market(we will continue to use the S+P) historically end up with as their return if they decide to put their money in for lets say 30 years. Did you fare any better than the average historical investor?
 
+```{r, echo=FALSE}
+
+historical_investor_30_year <- data.frame(
+          start_dates=seq(as.Date("1871-01-01"), as.Date("1988-09-01"), by="months"),
+           end_dates=seq(as.Date("1901-01-01"), as.Date("2018-09-01"),by="months")
+)
+
+#historical_investor_30_year$return <-
+#
+calculate_money_increase<- reactive({ function(start, end){
+    time_bound<-subset(stocks, stocks$date > as.Date(start) & stocks$date < as.Date(end))
+    money_in <- 30 * 12 * as.numeric(input$contrib)#anchoring this value because percents shouldn't change at all
+    amount <- tail(accumulate(as.numeric(time_bound$Value.Value), add_stock()),n=1)
+    money_final <- amount * tail(as.numeric(time_bound$Value.Value),n=1)  
+    return( as.character( (money_final/money_in - 1)*100) )
+  
+}
+})
+
+returns <- reactive({apply(as.matrix(historical_investor_30_year), 1, function(x) calculate_money_increase()(x[1],x[2]) )
+})
+  
+renderPlot({
+    plot(historical_investor_30_year$start_dates,returns(),type='l',ylab="Percent inrcrease of money invested",xlab="Date 30 year investment plan started")  
+})
+```
+
+As you can see there is a huge amount of variation in total returns when investors retired if they kept their money in the market and invested monthly for 30 years. Unsurprisingly the large dips that you see correspond to investors who took out all of their money for retirement, right as there was a huge market down turn. In other words, if you can, make sure to avoid retirement for 10 or so years if the market is headed downwards.
+
+So the next time someone sells you on the expected returns on their hedge or mutual fund, maybe consider asking them for a guaranteed income instead if you aren't someone who likes to worry.
